@@ -59,6 +59,9 @@ patches:
       - op: remove
         path: /metadata/shit
   - target: {}
-    patch: |-
+    patch: |- # delete field for all resources
+      - op: add
+        path: /metadata/shit
+        value: na
       - op: remove
         path: /metadata/shit
