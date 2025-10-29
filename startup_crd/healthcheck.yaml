@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ng-namespace
+---
+apiVersion: init.com/v100
+kind: NginxStart
+metadata:
+  name: nginx_init_app
+  namespace: ng-namespace
+  lable:
+    app: nginx-init
+spec:
+  externalLBPort: 3222

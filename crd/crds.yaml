@@ -1,0 +1,125 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: notifiers.nondotcom # <plural>.<group>
+spec:
+  group: nondotcom # not recomended # used for REST API: /apis/<group>/<version>
+  names:
+    kind: Notifier # use this kind in manifest to create your CRD object
+    plural: notifiers # used in the URL: /apis/<group>/<version>/<plural>
+    singular: notifier # used in the CLI to Create-Update-Delete-Read through API
+    shortNames: # shorter string to use in the CLI
+    - ntf # 'kubectl get mc' to get all object with kind 'MyCrd'
+  scope: Cluster
+  versions:
+    - name: v1
+      served: true # defines either particular version handles by Kubernetes API or not
+      # ^ if it's true, you can use this version in apiVersion
+      storage: false # only one version can be marked
+      # ^ cuz only particular version of an object may be stored in etcd
+      # served: true and storage: true - can use and can store
+      # served: false and storage: false - can't use and can't store
+      # served: true and storage: false - able to use as legacy but can not create new resources
+      # served: false and storage: true - should cause an k8s yaml error
+      schema: # Swagger validation schema custom objects
+        openAPIV3Schema:
+          type: object
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              properties:
+                my-own-field:
+                  type: integer
+                  minimum: 1
+              required: ["my-own-field"]
+          required: ["spec", "apiVersion", "kind"]
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              properties:
+                my-own-field:
+                  type: integer
+                  minimum: 0 # changed one
+              required: ["my-own-field"]
+          required: ["spec", "apiVersion", "kind"]
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: pcounters.counter.com # <plural>.<group>
+spec:
+  group: counter.com # used for REST API: /apis/<group>/<version>
+  names:
+    kind: PodCount # use this kind in manifest to create your CRD object
+    plural: pcounters # used in the URL: /apis/<group>/<version>/<plural>
+    singular: pcounter # used in the CLI to Create-Update-Delete-Read through API
+    shortNames: # shorter string to use in the CLI
+    - pcount # 'kubectl get mc' to get all object with kind 'MyCrd'
+  scope: Namespaced
+  versions:
+    - name: v1alpha
+      served: true # defines either particular version handles by Kubernetes API or not
+      # ^ if it's true, you can use this version in apiVersion
+      storage: false # only one version can be marked
+      # ^ cuz only particular version of an object may be stored in etcd
+      # served: true and storage: true - can use and can store
+      # served: false and storage: false - can't use and can't store
+      # served: true and storage: false - able to use as legacy but can not create new resources
+      # served: false and storage: true - should cause an k8s yaml error
+      schema: # Swagger validation schema custom objects
+        openAPIV3Schema:
+          type: object
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              properties:
+                my-own-field:
+                  type: integer
+                  minimum: 1
+              required: ["my-own-field"]
+          required: ["spec", "apiVersion", "kind"]
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              properties:
+                my-own-field:
+                  type: integer
+                  minimum: 0 # changed one
+              required: ["my-own-field"]
+          required: ["spec", "apiVersion", "kind"]
