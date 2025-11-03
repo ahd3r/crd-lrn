@@ -6,9 +6,10 @@ metadata:
 apiVersion: init.com/v100
 kind: NginxStart
 metadata:
-  name: nginx_init_app
+  name: nginx-init-app
   namespace: ng-namespace
-  lable:
+  labels:
     app: nginx-init
+    test: one
 spec:
   externalLBPort: 3222
