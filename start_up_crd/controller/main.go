@@ -64,7 +64,7 @@ func (r *NginxStartReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 	logger.Info(fmt.Sprintf("ObservedGeneration is %d", ns.Status.ObservedGeneration))
 	if !ns.ObjectMeta.DeletionTimestamp.IsZero() {
-		logger.Info("Remove Finalizers")
+		logger.Info("Remove Finalizers") // TODO why I don't see that in logs?
 		ns.SetFinalizers([]string{})
 		if err := r.Update(ctx, &ns); err != nil {
 			return ctrl.Result{}, err
