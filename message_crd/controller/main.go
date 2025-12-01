@@ -50,6 +50,7 @@ func (r *MessageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logger := l.FromContext(ctx) // build in logger can not be used
 	logger.Info("Reconcile is triggered")
 	var msg Message
+	// for reconcile to double run in order to delete resource with finalizer metadata
     if err := r.Get(ctx, req.NamespacedName, &msg); err != nil { // get resource that triggers reconcile
 		if errors.IsNotFound(err) { // avoid error on deletion, since delete also triggers reconcile and no resource is found on execution
 			return ctrl.Result{}, nil

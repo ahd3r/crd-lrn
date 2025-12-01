@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ns-namespace
+---
+apiVersion: init.com/v100
+kind: NginxStart
+metadata:
+  name: nginx-init-app
+  finalizers: ["true"]
+  namespace: ns-namespace
+  labels:
+    app: ns-init
+spec:
+  nodePort: 30008
