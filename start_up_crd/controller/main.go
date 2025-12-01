@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -21,8 +22,11 @@ import (
 type NginxStart struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              struct {
-		NodePort int32 `json:"text"`
+	Status            struct {
+		ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	} `json:"status,omitempty"`
+	Spec struct {
+		NodePort int32 `json:"nodePort"`
 	} `json:"spec"`
 }
 
@@ -33,15 +37,15 @@ func (ns *NginxStart) DeepCopyObject() runtime.Object {
 }
 
 type NginxStartList struct {
-    metav1.TypeMeta `json:",inline"`
-    metav1.ListMeta `json:"metadata,omitempty"`
-    Items           []NginxStart `json:"items"`
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []NginxStart `json:"items"`
 }
 
 func (ns *NginxStartList) DeepCopyObject() runtime.Object {
-    out := new(NginxStartList)
-    *out = *ns
-    return out
+	out := new(NginxStartList)
+	*out = *ns
+	return out
 }
 
 type NginxStartReconciler struct {
@@ -52,49 +56,53 @@ func (r *NginxStartReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	logger := l.FromContext(ctx)
 	logger.Info("Reconcile is triggered")
 	var ns NginxStart
-	logger.Info(req.NamespacedName.String())
-    if err := r.Get(ctx, req.NamespacedName, &ns); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, &ns); err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
-        return ctrl.Result{}, err
-    }
+		return ctrl.Result{}, err
+	}
+	logger.Info(fmt.Sprintf("ObservedGeneration is %d", ns.Status.ObservedGeneration))
 	if !ns.ObjectMeta.DeletionTimestamp.IsZero() {
+		logger.Info("Remove Finalizers")
 		ns.SetFinalizers([]string{})
 		if err := r.Update(ctx, &ns); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
 	}
-	if err := r.generateRecourse(ctx, ns.Spec.NodePort); err != nil {
+	logger.Info(fmt.Sprintf("NodePort is %d", ns.Spec.NodePort))
+	// TODO: keep child resources in sync with crd val (if updated -> update, if deleted -> delete)
+	// TODO: if child resource gets updated, then sync crd
+	if err := r.generateRecourse(ctx, ns.Spec.NodePort, ns.Namespace); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
 }
 
-func (r *NginxStartReconciler) generateRecourse(ctx context.Context, nodePort int32) error {
+func (r *NginxStartReconciler) generateRecourse(ctx context.Context, nodePort int32, namespace string) error {
 	replicas := int32(1)
 	deploymentResource := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-            Name:      "nginx-deployment-from-crd-cc",
-            Namespace: "default",
+			Name:      "nginx-deployment-from-crd-cc",
+			Namespace: namespace,
 			Labels: map[string]string{
 				"manged": "cc",
 			},
-        },
+		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
-                MatchLabels: map[string]string{"app": "nginx"},
-            },
+				MatchLabels: map[string]string{"app": "nginx"},
+			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-                    Labels: map[string]string{"app": "nginx"},
-                },
+					Labels: map[string]string{"app": "nginx"},
+				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name: "nginx",
+							Name:  "nginx",
 							Image: "nginx:latest",
 							Ports: []corev1.ContainerPort{
 								{
@@ -108,33 +116,33 @@ func (r *NginxStartReconciler) generateRecourse(ctx context.Context, nodePort in
 		},
 	}
 	if err := r.Create(ctx, &deploymentResource); err != nil {
-		return err;
+		return err
 	}
 	serviceResource := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "my-nginx-service-from-crd-cc",
-			Namespace: "default",
+			Name:      "my-nginx-service-from-crd-cc",
+			Namespace: namespace,
 			Labels: map[string]string{
 				"manged": "cc",
 			},
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{"app": "nginx"},
-			Type: "NodePort",
+			Type:     "NodePort",
 			Ports: []corev1.ServicePort{
 				{
-					Protocol: "TCP",
-					Port: 3200,
+					Protocol:   "TCP",
+					Port:       3200,
 					TargetPort: intstr.FromInt(80),
-					NodePort: nodePort,
+					NodePort:   nodePort,
 				},
 			},
 		},
 	}
 	if err := r.Create(ctx, &serviceResource); err != nil {
-		return err;
+		return err
 	}
-	return nil;
+	return nil
 }
 
 func (r *NginxStartReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -146,12 +154,12 @@ func (r *NginxStartReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func main() {
-	scheme := runtime.NewScheme() 
+	scheme := runtime.NewScheme()
 	gvk := schema.GroupVersion{Group: "init.com", Version: "v100"}
 	scheme.AddKnownTypes(gvk, &NginxStart{}, &NginxStartList{})
 	metav1.AddToGroupVersion(scheme, gvk)
-    appsv1.AddToScheme(scheme)
-    corev1.AddToScheme(scheme)
+	appsv1.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
