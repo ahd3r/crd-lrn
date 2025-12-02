@@ -30,3 +30,17 @@ spec:
       port: 3200
       targetPort: 80
   type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-node-service
+spec:
+  selector:
+    app: nginx
+  ports:
+    - protocol: TCP
+      port: 3200
+      targetPort: 80
+      nodePort: 30010
+  type: NodePort
