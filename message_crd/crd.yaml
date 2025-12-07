@@ -4,7 +4,7 @@ metadata:
   name: messages.init.com
 spec:
   group: init.com
-  names:
+  names: # watch out to not overide existing ones
     kind: Message
     plural: messages
     singular: message

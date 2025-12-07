@@ -4,12 +4,12 @@ metadata:
   name: nginxstarts.init.com
 spec:
   group: init.com
-  names:
+  names: # watch out to not overide existing ones
     kind: NginxStart
     plural: nginxstarts
     singular: nginxstart
     shortNames:
-    - ns
+    - ngst
   scope: Namespaced
   versions:
   - name: v100

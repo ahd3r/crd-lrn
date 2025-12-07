@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,8 +23,8 @@ import (
 type NginxStart struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Status            struct {
-		ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	Status            *struct {
+		ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 	} `json:"status,omitempty"`
 	Spec struct {
 		NodePort int32 `json:"nodePort"`
@@ -52,6 +53,9 @@ type NginxStartReconciler struct {
 	client.Client
 }
 
+// Why can't I get nginxstart with kubectl get all -n ns-namespace or kubectl get all --all-namespace? Because kubectl get all doesn't return CR or CRD, it only returns: pods, services, deployments, replicasets, statefulsets, daemonsets, jobs, cronjobs
+// what would happen if unchanged version of CRD gets applied? Would it trigger a reconcile? NO, it will be just ignored
+// TODO: why resource remove doesn't work when manualy removed one of the child?
 func (r *NginxStartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := l.FromContext(ctx)
 	logger.Info("Reconcile is triggered")
@@ -62,9 +66,59 @@ func (r *NginxStartReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 		return ctrl.Result{}, err
 	}
-	logger.Info(fmt.Sprintf("ObservedGeneration is %d", ns.Status.ObservedGeneration))
-	if !ns.ObjectMeta.DeletionTimestamp.IsZero() {
-		logger.Info("Remove Finalizers") // TODO why I don't see that in logs?
+	if !ns.ObjectMeta.DeletionTimestamp.IsZero() { // resources will be deleted separatlly
+		logger.Info("Remove Children")
+		var dep appsv1.Deployment
+		depExist := true
+		if err := r.Get(ctx, types.NamespacedName{Name: "nginx-deployment-from-crd-cc-" + req.NamespacedName.Name, Namespace: req.NamespacedName.Namespace}, &dep); err != nil {
+			depExist = false
+			if !errors.IsNotFound(err) {
+				return ctrl.Result{}, err
+			}
+		}
+		if depExist {
+			depExist = false
+			for _, owner := range dep.GetOwnerReferences() {
+				if owner.Kind == "NginxStart" {
+					depExist = true
+				}
+			}
+			if depExist {
+				dep.SetFinalizers([]string{})
+				if err := r.Update(ctx, &dep); err != nil { // Would it trigger reconcile? YES, but it will finish this current execution and on the next on it falls under NotFound error that is ignored
+					return ctrl.Result{}, err
+				}
+				if err := r.Delete(ctx, &dep); err != nil { // This will not trigger reconcile, as well as next ones
+					return ctrl.Result{}, err
+				}
+			}
+		}
+		var ser corev1.Service
+		serExist := true
+		if err := r.Get(ctx, types.NamespacedName{Name: "my-nginx-service-from-crd-cc-" + req.NamespacedName.Name, Namespace: req.NamespacedName.Namespace}, &ser); err != nil {
+			serExist = false
+			if !errors.IsNotFound(err) {
+				return ctrl.Result{}, err
+			}
+		}
+		if serExist {
+			serExist = false
+			for _, owner := range ser.GetOwnerReferences() {
+				if owner.Kind == "NginxStart" {
+					serExist = true
+				}
+			}
+			if serExist {
+				ser.SetFinalizers([]string{})
+				if err := r.Update(ctx, &ser); err != nil {
+					return ctrl.Result{}, err
+				}
+				if err := r.Delete(ctx, &ser); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+		}
+		logger.Info("Remove Finalizers")
 		ns.SetFinalizers([]string{})
 		if err := r.Update(ctx, &ns); err != nil {
 			return ctrl.Result{}, err
@@ -72,23 +126,63 @@ func (r *NginxStartReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 	logger.Info(fmt.Sprintf("NodePort is %d", ns.Spec.NodePort))
-	// TODO: keep child resources in sync with crd val (if updated -> update, if deleted -> delete)
-	// TODO: if child resource gets updated, then sync crd
-	if err := r.generateRecourse(ctx, ns.Spec.NodePort, ns.Namespace); err != nil {
-		return ctrl.Result{}, err
+
+	// TODO: keep child resources in sync with crd val (if updated -> update)
+	// TODO: if child resource gets updated, then sync cr
+	var dep appsv1.Deployment
+	depExist := true
+	if err := r.Get(ctx, types.NamespacedName{Name: "nginx-deployment-from-crd-cc-" + req.NamespacedName.Name, Namespace: req.NamespacedName.Namespace}, &dep); err != nil {
+		depExist = false
+		if !errors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+	}
+	var ser corev1.Service
+	serExist := true
+	if err := r.Get(ctx, types.NamespacedName{Name: "my-nginx-service-from-crd-cc-" + req.NamespacedName.Name, Namespace: req.NamespacedName.Namespace}, &ser); err != nil {
+		serExist = false
+		if !errors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+	}
+	if !depExist && !serExist {
+		logger.Info("Generate Resources")
+		if err := r.generateRecourse(ctx, ns.Spec.NodePort, ns.Namespace, ns.Name); err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		depExist = false
+		for _, owner := range dep.GetOwnerReferences() {
+			if owner.Kind == "NginxStart" {
+				depExist = true
+			}
+		}
+		serExist = false
+		for _, owner := range ser.GetOwnerReferences() {
+			if owner.Kind == "NginxStart" {
+				serExist = true
+			}
+		}
+		if depExist && serExist {
+			logger.Info("Synchronize Resources")
+		} else {
+			logger.Info("Resources name conflict")
+			return ctrl.Result{}, errors.NewBadRequest("Resources name conflict") // Maybe buggy, in the way that if CR is created, and conflicted resource gets deleted, it takes some time (up to 5 mins) for reconcile to re-run
+		}
 	}
 	return ctrl.Result{}, nil
 }
 
-func (r *NginxStartReconciler) generateRecourse(ctx context.Context, nodePort int32, namespace string) error {
+func (r *NginxStartReconciler) generateRecourse(ctx context.Context, nodePort int32, namespace string, name string) error {
 	replicas := int32(1)
 	deploymentResource := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "nginx-deployment-from-crd-cc",
+			Name:      "nginx-deployment-from-crd-cc-" + name,
 			Namespace: namespace,
 			Labels: map[string]string{
 				"manged": "cc",
 			},
+			Finalizers: []string {"true.test/finalizer"},
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -120,11 +214,12 @@ func (r *NginxStartReconciler) generateRecourse(ctx context.Context, nodePort in
 	}
 	serviceResource := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-nginx-service-from-crd-cc",
+			Name:      "my-nginx-service-from-crd-cc-" + name,
 			Namespace: namespace,
 			Labels: map[string]string{
 				"manged": "cc",
 			},
+			Finalizers: []string{"true.test/finalizer"},
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{"app": "nginx"},

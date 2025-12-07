@@ -8,7 +8,7 @@ sh ./start_up_crd/controller/deploy.sh
 kubectl logs deployment/ns-controller-dep --all-pods=true -f
 # open another terminal
 kubectl apply -f ./start_up_crd/nginx_start.yaml
-curl 0.0.0.0:30008
+curl 35.188.72.228:30008
 ```
 
 Generates:
@@ -16,9 +16,14 @@ Generates:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-deployment-from-crd-cc
+  finalizers:
+  - true.test/finalizer
+  labels:
+    manged: cc
+  name: nginx-deployment-from-crd-cc-nginx-init-app
+  namespace: ns-namespace
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: nginx
@@ -28,22 +33,28 @@ spec:
         app: nginx
     spec:
       containers:
-      - name: nginx
-        image: nginx:latest
+      - image: nginx:latest
+        name: nginx
         ports:
         - containerPort: 80
+          protocol: TCP
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: my-nginx-service-from-crd-cc
+  finalizers:
+  - true.test/finalizer
+  labels:
+    manged: cc
+  name: my-nginx-service-from-crd-cc-nginx-init-app
+  namespace: ns-namespace
 spec:
+  ports:
+  - nodePort: < --- >
+    port: 3200
+    protocol: TCP
+    targetPort: 80
   selector:
     app: nginx
-  ports:
-    - protocol: TCP
-      port: 3200
-      targetPort: 80
-      nodePort: <--->
   type: NodePort
 ```
