@@ -55,12 +55,12 @@ type NginxStartReconciler struct {
 
 // Why can't I get nginxstart with kubectl get all -n ns-namespace or kubectl get all --all-namespace? Because kubectl get all doesn't return CR or CRD, it only returns: pods, services, deployments, replicasets, statefulsets, daemonsets, jobs, cronjobs
 // what would happen if unchanged version of CRD gets applied? Would it trigger a reconcile? NO, it will be just ignored
-// TODO: why resource remove doesn't work when manualy removed one of the child?
+// TODO: on child remove - remove parent CR
 func (r *NginxStartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := l.FromContext(ctx)
 	logger.Info("Reconcile is triggered")
 	var ns NginxStart
-	if err := r.Get(ctx, req.NamespacedName, &ns); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, &ns); err != nil { // TODO: request the right kind with similar req.NamespacedName, if reconcile is triggered by a child0
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
@@ -70,59 +70,80 @@ func (r *NginxStartReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		logger.Info("Remove Children")
 		var dep appsv1.Deployment
 		depExist := true
+		logger.Info("Looking for a Deployment")
 		if err := r.Get(ctx, types.NamespacedName{Name: "nginx-deployment-from-crd-cc-" + req.NamespacedName.Name, Namespace: req.NamespacedName.Namespace}, &dep); err != nil {
 			depExist = false
 			if !errors.IsNotFound(err) {
 				return ctrl.Result{}, err
 			}
+			logger.Info("Couldn't find a Deployment")
 		}
 		if depExist {
+			logger.Info("Found a Deployment to remove")
+			logger.Info("Validating ownership")
 			depExist = false
 			for _, owner := range dep.GetOwnerReferences() {
+				logger.Info("Found owner with next properties", "Name", owner.Name, "Kind", owner.Kind)
 				if owner.Kind == "NginxStart" {
+					logger.Info("Ownership approved")
 					depExist = true
 				}
 			}
 			if depExist {
+				logger.Info("Removing Finalizers")
 				dep.SetFinalizers([]string{})
 				if err := r.Update(ctx, &dep); err != nil { // Would it trigger reconcile? YES, but it will finish this current execution and on the next on it falls under NotFound error that is ignored
 					return ctrl.Result{}, err
 				}
+				logger.Info("Deleting resource")
 				if err := r.Delete(ctx, &dep); err != nil { // This will not trigger reconcile, as well as next ones
 					return ctrl.Result{}, err
 				}
+			} else {
+				logger.Info("Ownership failed")
 			}
 		}
 		var ser corev1.Service
 		serExist := true
+		logger.Info("Looking for a Service")
 		if err := r.Get(ctx, types.NamespacedName{Name: "my-nginx-service-from-crd-cc-" + req.NamespacedName.Name, Namespace: req.NamespacedName.Namespace}, &ser); err != nil {
 			serExist = false
 			if !errors.IsNotFound(err) {
 				return ctrl.Result{}, err
 			}
+			logger.Info("Couldn't find a Service")
 		}
 		if serExist {
+			logger.Info("Found a Service to remove")
+			logger.Info("Validating ownership")
 			serExist = false
 			for _, owner := range ser.GetOwnerReferences() {
+				logger.Info("Found owner with next properties", "Name", owner.Name, "Kind", owner.Kind)
 				if owner.Kind == "NginxStart" {
 					serExist = true
+					logger.Info("Ownership approved")
 				}
 			}
 			if serExist {
+				logger.Info("Removing Finalizers")
 				ser.SetFinalizers([]string{})
 				if err := r.Update(ctx, &ser); err != nil {
 					return ctrl.Result{}, err
 				}
+				logger.Info("Deleting resource")
 				if err := r.Delete(ctx, &ser); err != nil {
 					return ctrl.Result{}, err
 				}
+			} else {
+				logger.Info("Ownership failed")
 			}
 		}
-		logger.Info("Remove Finalizers")
+		logger.Info("Remove CR Finalizers")
 		ns.SetFinalizers([]string{})
 		if err := r.Update(ctx, &ns); err != nil {
 			return ctrl.Result{}, err
 		}
+		logger.Info("Auto Removal of CR")
 		return ctrl.Result{}, nil
 	}
 	logger.Info(fmt.Sprintf("NodePort is %d", ns.Spec.NodePort))
@@ -183,6 +204,7 @@ func (r *NginxStartReconciler) generateRecourse(ctx context.Context, nodePort in
 				"manged": "cc",
 			},
 			Finalizers: []string {"true.test/finalizer"},
+			OwnerReferences: ,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
