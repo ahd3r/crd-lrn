@@ -11,3 +11,7 @@ rm k9s_linux_amd64.deb
 ```
 - node, go, kubectl, gcloud, helm, ...
     - installed by default
+- shell gcloud login
+```bash
+gcloud auth login --no-launch-browser
+```

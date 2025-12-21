@@ -204,7 +204,6 @@ func (r *NginxStartReconciler) generateRecourse(ctx context.Context, nodePort in
 				"manged": "cc",
 			},
 			Finalizers: []string {"true.test/finalizer"},
-			OwnerReferences: ,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
