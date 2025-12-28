@@ -9,6 +9,5 @@ fi
 
 gcloud auth configure-docker us-central1-docker.pkg.dev
 dir="$(cd "$(dirname "$0")"; pwd)"
-docker build -t us-east1-docker.pkg.dev/lrncrd/test/controller-ns:latest $dir
-docker push us-east1-docker.pkg.dev/lrncrd/test/controller-ns:latest
+gcloud builds submit $dir --tag us-central1-docker.pkg.dev/lrncrd-481920/ctrls/controller-ns:latest
 kubectl apply -f $dir/k8s_crd_controller_deploy.yaml
