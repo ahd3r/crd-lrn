@@ -57,4 +57,4 @@ spec:
       serviceAccountName: ns-controller-sa
       containers:
       - name: controller-ns
-        image: us-central1-docker.pkg.dev/lrn-crd/crdcontroller/controller-ns:latest
+        image: us-central1-docker.pkg.dev/lrncrd-481920/ctrls/controller-ns:latest
