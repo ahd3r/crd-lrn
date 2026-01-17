@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	l "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type NginxStart struct {
@@ -51,22 +52,27 @@ func (ns *NginxStartList) DeepCopyObject() runtime.Object {
 
 type NginxStartReconciler struct {
 	client.Client
+	Scheme *runtime.Scheme
 }
 
-// Why can't I get nginxstart with kubectl get all -n ns-namespace or kubectl get all --all-namespace? Because kubectl get all doesn't return CR or CRD, it only returns: pods, services, deployments, replicasets, statefulsets, daemonsets, jobs, cronjobs
+// Why can't I get nginxstart with kubectl get all -n ns-namespace or kubectl get all --all-namespace? Because "kubectl get all" doesn't return CR or CRD, it only returns: pods, services, deployments, replicasets, statefulsets, daemonsets, jobs, cronjobs
 // what would happen if unchanged version of CRD gets applied? Would it trigger a reconcile? NO, it will be just ignored
 // TODO: on child remove - remove parent CR
+// TODO: keep child resources in sync with parent crd (if updated -> update)
+// TODO: keep parent crd in sync with child resources (if updated -> update)
 func (r *NginxStartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := l.FromContext(ctx)
-	logger.Info("Reconcile is triggered")
+	logger.Info("Reconcile is triggered") // TODO: is it gonna be triggered with child resource delete/update? If yes, what is req.NamespacedName?
 	var ns NginxStart
-	if err := r.Get(ctx, req.NamespacedName, &ns); err != nil { // TODO: request the right kind with similar req.NamespacedName, if reconcile is triggered by a child0
+	// r.Get() - Queries a resource that triggered a reconcile, by metadata.name, metadata.namespace (req.NamespacedName) and struct type.
+	// I use kind to get resource as static value. How to understand what kind of resource triggered reconcile?
+	if err := r.Get(ctx, req.NamespacedName, &ns); err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
 	}
-	if !ns.ObjectMeta.DeletionTimestamp.IsZero() { // resources will be deleted separatlly
+	if !ns.ObjectMeta.DeletionTimestamp.IsZero() {
 		logger.Info("Remove Children")
 		var dep appsv1.Deployment
 		depExist := true
@@ -146,10 +152,8 @@ func (r *NginxStartReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		logger.Info("Auto Removal of CR")
 		return ctrl.Result{}, nil
 	}
-	logger.Info(fmt.Sprintf("NodePort is %d", ns.Spec.NodePort))
 
-	// TODO: keep child resources in sync with crd val (if updated -> update)
-	// TODO: if child resource gets updated, then sync cr
+	logger.Info("Searching resources")
 	var dep appsv1.Deployment
 	depExist := true
 	if err := r.Get(ctx, types.NamespacedName{Name: "nginx-deployment-from-crd-cc-" + req.NamespacedName.Name, Namespace: req.NamespacedName.Namespace}, &dep); err != nil {
@@ -166,35 +170,37 @@ func (r *NginxStartReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, err
 		}
 	}
+
 	if !depExist && !serExist {
 		logger.Info("Generate Resources")
-		if err := r.generateRecourse(ctx, ns.Spec.NodePort, ns.Namespace, ns.Name); err != nil {
+		logger.Info(fmt.Sprintf("NodePort is %d", ns.Spec.NodePort))
+		if err := r.generateRecourse(ctx, ns.Spec.NodePort, ns.Namespace, ns.Name, ns); err != nil {
 			return ctrl.Result{}, err
 		}
 	} else {
-		depExist = false
-		for _, owner := range dep.GetOwnerReferences() {
-			if owner.Kind == "NginxStart" {
-				depExist = true
-			}
-		}
-		serExist = false
-		for _, owner := range ser.GetOwnerReferences() {
-			if owner.Kind == "NginxStart" {
-				serExist = true
-			}
-		}
-		if depExist && serExist {
-			logger.Info("Synchronize Resources")
-		} else {
-			logger.Info("Resources name conflict")
-			return ctrl.Result{}, errors.NewBadRequest("Resources name conflict") // Maybe buggy, in the way that if CR is created, and conflicted resource gets deleted, it takes some time (up to 5 mins) for reconcile to re-run
-		}
+		// depExist = false
+		// for _, owner := range dep.GetOwnerReferences() {
+		// 	if owner.Kind == "NginxStart" {
+		// 		depExist = true
+		// 	}
+		// }
+		// serExist = false
+		// for _, owner := range ser.GetOwnerReferences() {
+		// 	if owner.Kind == "NginxStart" {
+		// 		serExist = true
+		// 	}
+		// }
+		// if depExist && serExist {
+		// 	logger.Info("Synchronize Resources")
+		// } else {
+		// 	logger.Info("Resources name conflict")
+		// 	return ctrl.Result{}, errors.NewBadRequest("Resources name conflict") // Maybe buggy, in the way that if CR is created, and conflicted resource gets deleted, it takes some time (up to 5 mins) for reconcile to re-run
+		// }
 	}
 	return ctrl.Result{}, nil
 }
 
-func (r *NginxStartReconciler) generateRecourse(ctx context.Context, nodePort int32, namespace string, name string) error {
+func (r *NginxStartReconciler) generateRecourse(ctx context.Context, nodePort int32, namespace string, name string, ownerResource NginxStart) error {
 	replicas := int32(1)
 	deploymentResource := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -230,6 +236,9 @@ func (r *NginxStartReconciler) generateRecourse(ctx context.Context, nodePort in
 			},
 		},
 	}
+	if err := controllerutil.SetControllerReference(&ownerResource, &deploymentResource, r.Scheme); err != nil {
+        return err
+    }
 	if err := r.Create(ctx, &deploymentResource); err != nil {
 		return err
 	}
@@ -255,6 +264,9 @@ func (r *NginxStartReconciler) generateRecourse(ctx context.Context, nodePort in
 			},
 		},
 	}
+	if err := controllerutil.SetControllerReference(&ownerResource, &serviceResource, r.Scheme); err != nil {
+        return err
+    }
 	if err := r.Create(ctx, &serviceResource); err != nil {
 		return err
 	}
