@@ -70,11 +70,22 @@ docker run -d --name caddy -p 80:80 -p 443:443 -v "./index.html:/usr/share/caddy
 cd ~
 mkdir project
 cd project
-mkdir test
-cd test
+mkdir nginx_with_ssl
+cd nginx_with_ssl
 echo 'server {
     listen 80;
-    server_name general-solution.com;
+    server_name general-solution.com www.general-solution.com;
+
+    root   /usr/share/nginx/html;
+    index  index.html index.htm;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+}' > nonssl-default.conf
+echo 'server {
+    listen 80;
+    server_name general-solution.com www.general-solution.com;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -87,7 +98,7 @@ echo 'server {
 
 server {
     listen 443 ssl;
-    server_name general-solution.com;
+    server_name general-solution.com www.general-solution.com;
 
     ssl_certificate /etc/letsencrypt/live/general-solution.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/general-solution.com/privkey.pem;
@@ -96,10 +107,40 @@ server {
         root   /usr/share/nginx/html;
         index  index.html index.htm;
     }
-}
-' > default.conf
-echo '
-version: "3.9"
+}' > default.conf
+echo '<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h1>Running...</h1>
+    <h2>Working...</h2>
+    <h2>Test</h2>
+</body>
+</html>' > index.html
+echo 'version: "3.9"
+services:
+  nginx-nonssl:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html
+      - ./nonssl-default.conf:/etc/nginx/conf.d/default.conf
+      - ./www:/var/www/certbot
+  certbot-init:
+    image: certbot/certbot
+    entrypoint: sh -c "certbot certonly --webroot -w /var/www/certbot -d general-solution.com --email you@email.com --agree-tos --no-eff-email --keep-until-expiring"
+    volumes:
+      - ./certbot:/etc/letsencrypt
+      - ./www:/var/www/certbot
+    depends_on:
+      - nginx-nonssl
+' > docker-compose-cert-gen.yaml
+echo 'version: "3.9"
 services:
   nginx:
     image: nginx:latest
@@ -107,34 +148,28 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      # - ./index.html:/usr/share/nginx/html/index.html
+      - ./index.html:/usr/share/nginx/html/index.html
       - ./default.conf:/etc/nginx/conf.d/default.conf
       - ./www:/var/www/certbot
       - ./certbot:/etc/letsencrypt
-  certbot-init:
-    image: certbot/certbot
-    volumes:
-      - ./certbot:/etc/letsencrypt
-      - ./www:/var/www/certbot
-    entrypoint: sh -c "certbot certonly --webroot -w /var/www/certbot -d general-solution.com --email you@email.com --agree-tos --no-eff-email"
-    depends_on:
-      - nginx
   certbot:
     image: certbot/certbot
+    entrypoint: >
+      sh -c "trap exit TERM;
+      while :; do
+        sleep 10d & wait $${!};
+        certbot renew;
+      done"
     volumes:
       - ./certbot:/etc/letsencrypt
       - ./www:/var/www/certbot
-    entrypoint: >
-      sh -c "trap exit TERM;
-      sleep 1h & wait $${!};
-      while :; do
-        certbot renew;
-      done"
     depends_on:
-      certbot-init:
-        condition: service_completed_successfully
+      - nginx
 ' > docker-compose.yaml
-docker-compose up
+docker-compose -f ./docker-compose-cert-gen.yaml up -d
+sleep 30s
+docker-compose -f ./docker-compose-cert-gen.yaml stop
+docker-compose up -d
 ```
 - setup kubernetes cluster
 ```bash
