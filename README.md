@@ -50,6 +50,11 @@ docker run -d -p 80:80 nginx # router configured in the way to aim to internal n
 ```
 - to run simple server with SSL
 ```bash
+cd ~
+mkdir project
+cd project
+mkdir caddy_with_ssl
+cd caddy_with_ssl
 echo 'general-solution.com {
   root * /usr/share/caddy
   file_server
@@ -170,6 +175,72 @@ docker-compose -f ./docker-compose-cert-gen.yaml up -d
 sleep 30s
 docker-compose -f ./docker-compose-cert-gen.yaml stop
 docker-compose up -d
+```
+```bash
+cd ~
+mkdir project
+cd project
+mkdir traefik_with_ssl
+cd traefik_with_ssl
+echo 'version: "3.9"
+services:
+  traefik:
+    image: traefik:v3.6
+    ports:
+      - "80:80"
+      - "8080:8080"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./letsencrypt:/letsencrypt
+  app:
+    image: nginx:latest
+    volumes:
+      - ./default.conf:/etc/nginx/conf.d/default.conf
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app.rule=Host(`general-solution.com`)"
+      - "traefik.http.routers.app.entrypoints=websecure"
+      - "traefik.http.routers.app.tls.certresolver=letsencrypt"
+' > docker-compose.yaml
+echo 'api:
+  insecure: true
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+providers:
+  docker: {}
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "you@email.com"
+      storage: "/letsencrypt/acme.json"
+      httpChallenge:
+        entryPoint: web
+' > traefik.yml
+echo 'server {
+    listen 80;
+
+    root   /usr/share/nginx/html;
+    index  index.html;
+}
+' > default.conf
+docker-compose up -d
+```
+```bash
+cd ~
+mkdir project
+cd project
+mkdir envoy_with_ssl
+cd envoy_with_ssl
 ```
 - setup kubernetes cluster
 ```bash
