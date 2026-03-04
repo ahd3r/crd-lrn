@@ -1,0 +1,18 @@
+version: "3.9"
+services:
+  nginx-nonssl:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html
+      - ./nonssl-default.conf:/etc/nginx/conf.d/default.conf
+      - ./www:/var/www/certbot
+  certbot-init:
+    image: certbot/certbot
+    entrypoint: sh -c "certbot certonly --webroot -w /var/www/certbot -d general-solution.com --email you@email.com --agree-tos --no-eff-email --keep-until-expiring"
+    volumes:
+      - ./certbot:/etc/letsencrypt
+      - ./www:/var/www/certbot
+    depends_on:
+      - nginx-nonssl

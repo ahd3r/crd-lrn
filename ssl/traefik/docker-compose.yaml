@@ -1,0 +1,100 @@
+version: "3.9"
+services:
+  traefik:
+    image: traefik:v3.6
+    ports:
+      - "80:80"
+      - "8080:8080" # dashboard
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # make traefik aware of another services and make it capable to reach them once lable is set
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./letsencrypt:/letsencrypt
+  app:
+    image: nginx:latest
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html
+      - ./default.conf:/etc/nginx/conf.d/default.conf
+    labels:
+      - "traefik.enable=true" # helps traefik to recognize a new service that needs to be monitored, if exposedByDefault: false, otherwise this is optional
+      # - "traefik.http.routers.app.rule=PathPrefix(`/`)" # makes it accessible from any Host
+      - "traefik.http.routers.app.rule=Host(`general-solution.com`)" # same router name is prohibited, it will stop working
+      - "traefik.http.routers.app.entrypoints=websecure"
+      - "traefik.http.routers.app.tls.certresolver=letsencrypt"
+      - "traefik.http.services.app.loadbalancer.server.port=3026"
+  appbypath:
+    image: nginx:latest
+    volumes:
+      - ./default_2.conf:/etc/nginx/conf.d/default.conf
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.appbypath_rule1.rule=Host(`general-solution.com`) && PathPrefix(`/user`)"
+      - "traefik.http.routers.appbypath_rule1.entrypoints=websecure"
+      - "traefik.http.routers.appbypath_rule1.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.appbypath_rule2.rule=Host(`general-solution.com`) && Path(`/farewell`)"
+      - "traefik.http.routers.appbypath_rule2.entrypoints=websecure"
+      - "traefik.http.routers.appbypath_rule2.tls.certresolver=letsencrypt"
+  # nginx:
+  #   image: nginx:latest
+  #   deploy:
+  #     replicas: 3 # traefik will load balance requests to this service with round-robin algorithm
+  #   volumes:
+  #     - ./default_2.conf:/etc/nginx/conf.d/default.conf
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.nginx.rule=Host(`nginx.general-solution.com`)"
+  #     - "traefik.http.routers.nginx.entrypoints=websecure"
+  #     - "traefik.http.routers.nginx.tls.certresolver=letsencrypt"
+  #     # - "traefik.http.services.nginx.loadbalancer.server.port=80" # it is 80 by default
+  # apptwo:
+  #   image: nginx:latest
+  #   volumes:
+  #     - ./default_2.conf:/etc/nginx/conf.d/default.conf
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.apptwo.rule=Host(`two.one.general-solution.com`)"
+  #     - "traefik.http.routers.apptwo.entrypoints=websecure"
+  #     - "traefik.http.routers.apptwo.tls.certresolver=letsencrypt"
+  # appthree:
+  #   image: nginx:latest
+  #   volumes:
+  #     - ./default_2.conf:/etc/nginx/conf.d/default.conf
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.appthree.rule=Host(`longlonglonglonglonglonglonglonglonglonglonglonglongsubdomain.two.one.general-solution.com`)"
+  #     - "traefik.http.routers.appthree.entrypoints=websecure"
+  #     - "traefik.http.routers.appthree.tls.certresolver=letsencrypt"
+  # appfour:
+  #   image: nginx:latest
+  #   volumes:
+  #     - ./default_2.conf:/etc/nginx/conf.d/default.conf
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.appfour.rule=Host(`four.three.two.one.general-solution.com`)"
+  #     - "traefik.http.routers.appfour.entrypoints=websecure"
+  #     - "traefik.http.routers.appfour.tls.certresolver=letsencrypt"
+  # appfive:
+  #   image: nginx:latest
+  #   volumes:
+  #     - ./default_2.conf:/etc/nginx/conf.d/default.conf
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.appfive.rule=Host(`five.four.three.two.one.general-solution.com`)"
+  #     - "traefik.http.routers.appfive.entrypoints=websecure"
+  #     - "traefik.http.routers.appfive.tls.certresolver=letsencrypt"
+  envoy:
+    image: envoyproxy/envoy:v1.29-latest
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.envoy.rule=Host(`envoy.general-solution.com`)"
+      - "traefik.http.routers.envoy.entrypoints=websecure"
+      - "traefik.http.routers.envoy.tls.certresolver=letsencrypt"
+      - "traefik.http.services.envoy.loadbalancer.server.port=10000"
+  envoytwo:
+    image: envoyproxy/envoy:v1.29-latest
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.envoytwo.rule=Host(`envoy-two.general-solution.com`)"
+      - "traefik.http.routers.envoytwo.entrypoints=websecure"
+      - "traefik.http.routers.envoytwo.tls.certresolver=letsencrypt"
+      - "traefik.http.services.envoytwo.loadbalancer.server.port=9901"

@@ -46,7 +46,7 @@ curl -sS https://webinstall.dev/k9s | bash
 docker run -d -p 80:80 nginx # router configured in the way to aim to internal network port 80 and translate it to external ip on port 80 - http://173.174.98.86/
 ### make accessible from outside by exposing port in home router
 ### set domain to public ip
-### sometimes domain isn't reachable from local network due to local network can't reach public ip created in local network, but tp link resolves it automatically
+### sometimes domain isn't reachable from local network due to local network can't reach public ip created in local network, but tp link router resolves it automatically
 ```
 - to run simple server with SSL
 ```bash
@@ -182,28 +182,14 @@ mkdir project
 cd project
 mkdir traefik_with_ssl
 cd traefik_with_ssl
-echo 'version: "3.9"
-services:
-  traefik:
-    image: traefik:v3.6
-    ports:
-      - "80:80"
-      - "8080:8080"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./letsencrypt:/letsencrypt
-  app:
-    image: nginx:latest
-    volumes:
-      - ./default.conf:/etc/nginx/conf.d/default.conf
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.app.rule=Host(`general-solution.com`)"
-      - "traefik.http.routers.app.entrypoints=websecure"
-      - "traefik.http.routers.app.tls.certresolver=letsencrypt"
-' > docker-compose.yaml
+echo 'server {
+    listen 80;
+    root /usr/share/nginx/html;
+    location / {
+        try_files /index.html =200;
+    }
+}
+' > default.conf
 echo 'api:
   insecure: true
 entryPoints:
@@ -223,16 +209,28 @@ certificatesResolvers:
     acme:
       email: "you@email.com"
       storage: "/letsencrypt/acme.json"
-      httpChallenge:
-        entryPoint: web
+      tlsChallenge: {}
 ' > traefik.yml
-echo 'server {
-    listen 80;
-
-    root   /usr/share/nginx/html;
-    index  index.html;
-}
-' > default.conf
+echo 'version: "3.9"
+services:
+  traefik:
+    image: traefik:v3.6
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./letsencrypt:/letsencrypt
+  app:
+    image: nginx:latest
+    volumes:
+      - ./default.conf:/etc/nginx/conf.d/default.conf
+    labels:
+      - "traefik.http.routers.app.rule=Host(`general-solution.com`)"
+      - "traefik.http.routers.app.entrypoints=websecure"
+      - "traefik.http.routers.app.tls.certresolver=letsencrypt"
+' > docker-compose.yaml
 docker-compose up -d
 ```
 ```bash
@@ -245,3 +243,4 @@ cd envoy_with_ssl
 - setup kubernetes cluster
 ```bash
 ```
+- install opencode

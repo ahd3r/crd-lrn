@@ -1,0 +1,28 @@
+# Configuration full spec can be found here: 
+# - https://json.schemastore.org/traefik-v3.json -> unofficial
+# - go struct - https://github.com/traefik/traefik/blob/master/pkg/config/static/static_config.go#L61 -> fully official
+# - kubernetes CRD - https://artifacthub.io/api/v1/packages/8ba0f6dc-591e-4ff4-a2d6-acdbd271677e/39.1.0-ea.2/values-schema -> semi-official and not exactly fits to config yml
+# 
+# all traefik configuration params that seated in this file are static, which means changes won't make effect unless traefik service/container restarts
+# all configuration that defined in docker for other containers are dynamic, which means changing them will take effect without traefik restart
+api:
+  insecure: true
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+providers:
+  docker:
+    exposedByDefault: false # more production ready
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "you@email.com"
+      storage: "/letsencrypt/acme.json"
+      tlsChallenge: {}
