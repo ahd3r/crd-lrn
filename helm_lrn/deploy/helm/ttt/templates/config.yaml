@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap
+data:
+  port_v: {{ .Values.port }}
+  val_v: {{ .Values.val }}
+  name_upper_c: {{ .Chart.Name }}
+  name_lower_c: {{ .Chart.name }}
+  name_include: {{ include "name" . }}
+  name_r: {{ .Release.Name }}
+  namespace_r: {{ .Release.Namespace }}
+  key: nothing
