@@ -7,6 +7,7 @@
 # all configuration that defined in docker for other containers are dynamic, which means changing them will take effect without traefik restart
 api:
   insecure: true
+  dashboard: true
 entryPoints:
   web:
     address: ":80"
