@@ -21,12 +21,12 @@ curl -sS https://webinstall.dev/k9s | bash
 - node, go, kubectl, gcloud, helm, ...
     - installed by default
 
-# Raspberry PI 5 setup
+# Raspberry PI setup
 - ssh
     - VSCode
-        - delete the previous one
-        - create a new one
-        - even though you had the same configuration, it wouldn't work, you need to recreate for some reason
+        - delete `~/.ssh/known_hosts` and `~/.ssh/known_hosts.old`
+        - update `~/.ssh/config` by adding a new host
+        - even though you had the same configuration
 - CLI
 ```bash
 echo "alias ll='ls --all -l'" >> ~/.bashrc
@@ -242,7 +242,7 @@ cd envoy_with_ssl
 ```
 - setup kubernetes cluster
 ```bash
-echo 'cgroup_enable=memory' | sudo tee /boot/firmware/cmdline.txt
+echo -n ' cgroup_enable=cpuset cgroup_enable=memory cgroup_memory=1' | sudo tee -a /boot/firmware/cmdline.txt
 sudo reboot
 # kind cli
 [ $(uname -m) = x86_64 ] && curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64
@@ -274,5 +274,23 @@ kind create cluster --config kind-config.yaml
 # k3d cli
 curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 k3d cluster create dev-cluster --servers 1 --agents 2 --wait
+# k3s cli (for 2 machines in local network)
+# on first machine
+curl -sfL https://get.k3s.io | sh -
+echo 'tls-san:
+  - kuber.general-solution.com' > /etc/rancher/k3s/config.yaml
+sudo systemctl restart k3s
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+kubectl config rename-context default k3s-cluster
+kubectl get pods
+
+ip a | grep 192 # local ip
+sudo cat /var/lib/rancher/k3s/server/node-token # token
+# on second machine
+curl -sfL https://get.k3s.io | K3S_URL=https://<control-plane-ip>:6443 K3S_TOKEN=<tone> sh -
+mkdir ~/.kube
+# copy ~/.kube/config from first machine to ~/.kube/config in second machine
+# kubeadm
+# minikube
 ```
 - install opencode
