@@ -29,20 +29,21 @@ curl -sS https://webinstall.dev/k9s | bash
         - even though you had the same configuration
 - CLI
 ```bash
-echo "alias ll='ls --all -l'" >> ~/.bashrc
 sudo apt update && sudo apt upgrade -y
+echo "alias ll='ls --all -l'" >> ~/.bashrc
 # install docker
-sudo apt install docker.io
+sudo apt install docker.io git -y
 sudo chown root:$USER /var/run/docker.sock
 # install docker-compose
 sudo apt install docker-compose
-# install kubectl
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/arm64/kubectl"
-chmod +x ./kubectl
-sudo mv ./kubectl /usr/local/bin/kubectl
+# pull kubernetes packages (install only kubectl)
+curl -fsSL "https://pkgs.k8s.io/core:/stable:/$(curl -L -s https://dl.k8s.io/release/stable.txt | sed 's/\.[0-9]*$//')/deb/Release.key" | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$(curl -L -s https://dl.k8s.io/release/stable.txt | sed 's/\.[0-9]*$//')/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+sudo apt-get install -y kubectl
 # install k9s
 curl -sS https://webinstall.dev/k9s | bash
-### reboot machine
+sudo reboot # reboot machine
 docker run -d -p 80:80 nginx # router configured in the way to aim to internal network port 80 and translate it to external ip on port 80 - http://173.174.98.86/
 ### make accessible from outside by exposing port in home router
 ### set domain to public ip
@@ -242,7 +243,12 @@ cd envoy_with_ssl
 ```
 - setup kubernetes cluster
 ```bash
+sudo apt remove zram-tools -y
+sudo apt remove systemd-zram-generator -y
+sudo swapoff -a
 echo -n ' cgroup_enable=cpuset cgroup_enable=memory cgroup_memory=1' | sudo tee -a /boot/firmware/cmdline.txt
+containerd config default | sudo tee /etc/containerd/config.toml
+sudo sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
 sudo reboot
 # ----------------------- kind cli -----------------------
 [ $(uname -m) = x86_64 ] && curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64
@@ -306,8 +312,26 @@ spec:
                 name: my-service
                 port:
                   number: 3200" | kubectl apply -f -
-# curl general-solution.com
+curl general-solution.com
+# to stop cluster
+# on first machine
+/usr/local/bin/k3s-killall.sh # stops all related processes
+/usr/local/bin/k3s-uninstall.sh # removes all related binaries
+# on second machine
+/usr/local/bin/k3s-killall.sh # stops all related processes
+/usr/local/bin/k3s-agent-uninstall.sh # removes all related binaries
 # ------------------------ kubeadm ------------------------
+# kubernetes package already pulled (line ~39)
+sudo apt-get install -y kubeadm kubelet
+sudo systemctl enable kubelet
+sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+mkdir -p ~/.kube
+sudo cp -i /etc/kubernetes/admin.conf ~/.kube/config
+sudo chown $(id -u):$(id -g) ~/.kube/config
+# to stop cluster
+sudo kubeadm reset -f
+sudo rm -rf /etc/cni/net.d
+sudo rm -rf ~/.kube
 # ----------------------- minikube -----------------------
 ```
 - install opencode
