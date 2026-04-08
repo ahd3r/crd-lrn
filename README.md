@@ -43,6 +43,8 @@ sudo apt-get update
 sudo apt-get install -y kubectl
 # install k9s
 curl -sS https://webinstall.dev/k9s | bash
+# install helm
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 sudo reboot # reboot machine
 docker run -d -p 80:80 nginx # router configured in the way to aim to internal network port 80 and translate it to external ip on port 80 - http://173.174.98.86/
 ### make accessible from outside by exposing port in home router
@@ -321,16 +323,36 @@ curl general-solution.com
 /usr/local/bin/k3s-killall.sh # stops all related processes
 /usr/local/bin/k3s-agent-uninstall.sh # removes all related binaries
 # ------------------------ kubeadm ------------------------
+# on first machine
 # kubernetes package already pulled (line ~39)
 sudo apt-get install -y kubeadm kubelet
-sudo systemctl enable kubelet
-sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+echo "apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+kubernetesVersion: $(curl -L -s https://dl.k8s.io/release/stable.txt)
+controlPlaneEndpoint: kuber.general-solution.com:6443
+apiServer:
+  certSANs:
+    - kuber.general-solution.com
+networking:
+  podSubnet: 10.244.0.0/16" > kubeadm-config.yaml
+sudo kubeadm init --config kubeadm-config.yaml
 mkdir -p ~/.kube
 sudo cp -i /etc/kubernetes/admin.conf ~/.kube/config
 sudo chown $(id -u):$(id -g) ~/.kube/config
+helm repo add cilium https://helm.cilium.io/
+helm repo update
+helm install cilium cilium/cilium --version 1.17.3 --namespace kube-system --set ipam.operator.clusterPoolIPv4PodCIDRList="10.244.0.0/16"
+kubeadm token create --print-join-command
+# on second machine
+# same preparation as control-panel
+sudo kubeadm join 192.168.0.186:6443 --token 8j3165.8eo42xm5dqy3mc3p --discovery-token-ca-cert-hash sha256:78171b3d01476253cba2888049af20e4cadad817b523ee7acd3e6e6f5ea93210
+mkdir ~/.kube
+# copy ~/.kube/config from first machine to ~/.kube/config in second machine
 # to stop cluster
 sudo kubeadm reset -f
 sudo rm -rf /etc/cni/net.d
+sudo rm -rf /var/lib/kubelet
+sudo rm -rf /var/lib/etcd
 sudo rm -rf ~/.kube
 # ----------------------- minikube -----------------------
 ```
