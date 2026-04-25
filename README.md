@@ -357,3 +357,9 @@ sudo rm -rf ~/.kube
 # ----------------------- minikube -----------------------
 ```
 - install opencode
+```bash
+curl -fsSL https://opencode.ai/install | bash
+# connect antropic to opencode via /connect
+# connect right model via /models
+# create proper skills, mcps, and commands
+```
