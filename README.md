@@ -342,6 +342,8 @@ sudo chown $(id -u):$(id -g) ~/.kube/config
 helm repo add cilium https://helm.cilium.io/
 helm repo update
 helm install cilium cilium/cilium --version 1.17.3 --namespace kube-system --set ipam.operator.clusterPoolIPv4PodCIDRList="10.244.0.0/16"
+kubectl get pods -n kube-system
+kubectl get nodes
 kubeadm token create --print-join-command
 # on second machine
 # same preparation as control-panel
