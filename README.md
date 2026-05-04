@@ -33,7 +33,7 @@ sudo apt update && sudo apt upgrade -y
 echo "alias ll='ls --all -l'" >> ~/.bashrc
 # install docker
 sudo apt install docker.io git -y
-sudo chown root:$USER /var/run/docker.sock
+getent group docker && sudo usermod -aG docker $USER
 # install docker-compose
 sudo apt install docker-compose
 # pull kubernetes packages (install only kubectl)
