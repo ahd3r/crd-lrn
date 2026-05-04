@@ -347,6 +347,7 @@ kubectl get nodes
 kubeadm token create --print-join-command
 # on second machine
 # same preparation as control-panel
+sudo apt-get install -y kubeadm kubelet
 sudo kubeadm join 192.168.0.186:6443 --token 8j3165.8eo42xm5dqy3mc3p --discovery-token-ca-cert-hash sha256:78171b3d01476253cba2888049af20e4cadad817b523ee7acd3e6e6f5ea93210
 mkdir ~/.kube
 # copy ~/.kube/config from first machine to ~/.kube/config in second machine
