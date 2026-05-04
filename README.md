@@ -339,9 +339,12 @@ sudo kubeadm init --config kubeadm-config.yaml
 mkdir -p ~/.kube
 sudo cp -i /etc/kubernetes/admin.conf ~/.kube/config
 sudo chown $(id -u):$(id -g) ~/.kube/config
+## CNI setup
+kubectl -n kube-system delete daemonset kube-proxy
+kubectl -n kube-system delete configmap kube-proxy
 helm repo add cilium https://helm.cilium.io/
 helm repo update
-helm install cilium cilium/cilium --version 1.17.3 --namespace kube-system --set ipam.operator.clusterPoolIPv4PodCIDRList="10.244.0.0/16"
+helm install cilium cilium/cilium --version 1.16.5 --namespace kube-system --set kubeProxyReplacement=true --set k8sServiceHost=kuber.general-solution.com --set k8sServicePort=6443 --set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=cluster-pool --set ipam.operator.clusterPoolIPv4PodCIDRList="10.244.0.0/16" --set ipam.operator.clusterPoolIPv4MaskSize=24 --set operator.replicas=1
 kubectl get pods -n kube-system
 kubectl get nodes
 kubeadm token create --print-join-command
