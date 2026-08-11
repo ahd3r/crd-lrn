@@ -253,6 +253,7 @@ sudo apt remove zram-tools -y
 sudo apt remove systemd-zram-generator -y
 sudo swapoff -a
 echo -n ' cgroup_enable=cpuset cgroup_enable=memory cgroup_memory=1' | sudo tee -a /boot/firmware/cmdline.txt
+sudo mkdir -p /etc/containerd
 containerd config default | sudo tee /etc/containerd/config.toml
 sudo sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
 sudo reboot
