@@ -246,6 +246,7 @@ cd envoy_with_ssl
 ```
 - setup kubernetes cluster
 ```bash
+# ----------------------- preparation -----------------------
 sudo apt remove zram-tools -y
 sudo apt remove systemd-zram-generator -y
 sudo swapoff -a
