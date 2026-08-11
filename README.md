@@ -22,6 +22,8 @@ curl -sS https://webinstall.dev/k9s | bash
     - installed by default
 
 # Raspberry PI setup
+- Operating system (OS)
+    - Ubuntu server 26.04 (LTS)
 - ssh
     - VSCode
         - _establish a connection via IP address and NOT domain_
