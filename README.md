@@ -38,7 +38,7 @@ echo "alias ll='ls --all -l'" >> ~/.bashrc
 sudo apt install docker.io git -y
 getent group docker && sudo usermod -aG docker $USER
 # install docker-compose
-sudo apt install docker-compose
+sudo apt install docker-compose -y
 # pull kubernetes packages (install only kubectl)
 curl -fsSL "https://pkgs.k8s.io/core:/stable:/$(curl -L -s https://dl.k8s.io/release/stable.txt | sed 's/\.[0-9]*$//')/deb/Release.key" | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$(curl -L -s https://dl.k8s.io/release/stable.txt | sed 's/\.[0-9]*$//')/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
