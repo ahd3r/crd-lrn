@@ -37,8 +37,6 @@ echo "alias ll='ls --all -l'" >> ~/.bashrc
 # install docker
 sudo apt install docker.io git -y
 getent group docker && sudo usermod -aG docker $USER
-# install docker-compose
-sudo apt install docker-compose -y
 # pull kubernetes packages (install only kubectl)
 curl -fsSL "https://pkgs.k8s.io/core:/stable:/$(curl -L -s https://dl.k8s.io/release/stable.txt | sed 's/\.[0-9]*$//')/deb/Release.key" | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$(curl -L -s https://dl.k8s.io/release/stable.txt | sed 's/\.[0-9]*$//')/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
@@ -177,10 +175,10 @@ services:
     depends_on:
       - nginx
 ' > docker-compose.yaml
-docker-compose -f ./docker-compose-cert-gen.yaml up -d
+docker compose -f ./docker-compose-cert-gen.yaml up -d
 sleep 30s
-docker-compose -f ./docker-compose-cert-gen.yaml stop
-docker-compose up -d
+docker compose -f ./docker-compose-cert-gen.yaml stop
+docker compose up -d
 ```
 ```bash
 cd ~
@@ -237,7 +235,7 @@ services:
       - "traefik.http.routers.app.entrypoints=websecure"
       - "traefik.http.routers.app.tls.certresolver=letsencrypt"
 ' > docker-compose.yaml
-docker-compose up -d
+docker compose up -d
 ```
 ```bash
 cd ~
