@@ -30,7 +30,7 @@ curl -sS https://webinstall.dev/k9s | bash
         - delete `~/.ssh/known_hosts` and `~/.ssh/known_hosts.old`
         - update `~/.ssh/config` by adding a new host
         - even though you had the same configuration
-- CLI
+- basic setup
 ```bash
 sudo apt update && sudo apt upgrade -y
 echo "alias ll='ls --all -l'" >> ~/.bashrc
